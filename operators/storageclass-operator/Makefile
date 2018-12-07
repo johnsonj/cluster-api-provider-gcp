@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= gcr.io/cluster-api-provider-gcp/storageclass-operator:latest
 
 all: test manager
 
@@ -41,8 +41,11 @@ vet:
 generate:
 	go generate ./pkg/... ./cmd/...
 
+go-build:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o ./manager sigs.k8s.io/cluster-api-provider-gcp/operators/storageclass-operator/cmd/manager
+
 # Build the docker image
-docker-build: test
+docker-build: go-build
 	docker build . -t ${IMG}
 	@echo "updating kustomize image patch file for manager resource"
 	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
