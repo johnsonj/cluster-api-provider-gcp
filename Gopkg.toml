@@ -40,3 +40,16 @@ version="v1.4.7"
 [[constraint]]
   name = "gopkg.in/gcfg.v1"
   version = "1.2.3"
+
+[[override]]
+  name   = "sigs.k8s.io/controller-runtime"
+  source = "https://github.com/johnsonj/controller-runtime.git"
+  branch = "minimal_addon_and_declarative_patterns"
+
+[[override]]
+  name    = "k8s.io/api"
+  version = "kubernetes-1.12.3"
+
+[[override]]
+  name     = "sigs.k8s.io/cluster-api"
+  revision = "6fe3ecb17bdcdf096ede34104af87f79c2e90e68"
