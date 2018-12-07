@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-gcp/operators/storageclass-operator/pkg/apis"
 	"sigs.k8s.io/cluster-api-provider-gcp/operators/storageclass-operator/pkg/controller"
 	"sigs.k8s.io/cluster-api-provider-gcp/operators/storageclass-operator/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/alpha/patterns/addon"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -30,6 +31,8 @@ import (
 )
 
 func main() {
+	addon.Init()
+
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("entrypoint")
 

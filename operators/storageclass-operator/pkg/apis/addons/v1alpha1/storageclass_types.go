@@ -18,21 +18,17 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/alpha/patterns/addon"
 )
-
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // StorageClassSpec defines the desired state of StorageClass
 type StorageClassSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	addon.CommonSpec
 }
 
 // StorageClassStatus defines the observed state of StorageClass
 type StorageClassStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	addon.CommonStatus
 }
 
 // +genclient
@@ -59,4 +55,22 @@ type StorageClassList struct {
 
 func init() {
 	SchemeBuilder.Register(&StorageClass{}, &StorageClassList{})
+}
+
+var _ addon.CommonObject = &StorageClass{}
+
+func (c *StorageClass) ComponentName() string {
+	return "storageclass"
+}
+
+func (c *StorageClass) CommonSpec() addon.CommonSpec {
+	return c.Spec.CommonSpec
+}
+
+func (c *StorageClass) GetCommonStatus() addon.CommonStatus {
+	return c.Status.CommonStatus
+}
+
+func (c *StorageClass) SetCommonStatus(s addon.CommonStatus) {
+	c.Status.CommonStatus = s
 }
