@@ -5,22 +5,22 @@ metadata:
   namespace: knative-build
 spec:
   version: v0.2.1
-# ---
-# apiVersion: addons.sigs.k8s.io/v1alpha1
-# kind: KnativeIstio
-# metadata:
-#   name: default
-#   namespace: istio-system
-# spec:
-#   version: v0.2.1
-# ---
-# apiVersion: addons.sigs.k8s.io/v1alpha1
-# kind: KnativeMonitoring
-# metadata:
-#   name: default
-#   namespace: knative-monitoring
-# spec:
-#   version: v0.2.1
+---
+apiVersion: addons.sigs.k8s.io/v1alpha1
+kind: KnativeIstio
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  version: v0.2.1
+---
+apiVersion: addons.sigs.k8s.io/v1alpha1
+kind: KnativeMonitoring
+metadata:
+  name: default
+  namespace: knative-monitoring
+spec:
+  version: v0.2.1
 ---
 apiVersion: addons.sigs.k8s.io/v1alpha1
 kind: KnativeServing

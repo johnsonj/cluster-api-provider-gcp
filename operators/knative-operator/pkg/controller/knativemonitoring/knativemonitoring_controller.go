@@ -60,6 +60,7 @@ func Add(mgr manager.Manager) error {
 	if err != nil {
 		return err
 	}
+
 	// Watch for changes to deployed objects
 	_, err = declarative.WatchAll(mgr.GetConfig(), c, r, declarative.SourceLabel)
 	if err != nil {

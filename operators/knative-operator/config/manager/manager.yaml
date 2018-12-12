@@ -49,7 +49,7 @@ spec:
       containers:
       - command:
         - /manager
-        image: controller:latest
+        image: gcr.io/jrjohnson-gke/knative-manager:latest
         imagePullPolicy: Always
         name: manager
         env:

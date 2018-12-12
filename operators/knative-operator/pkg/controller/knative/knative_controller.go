@@ -58,11 +58,6 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	/*
-		err = c.Watch(&source.Kind{Type: &addonsv1alpha1.KnativeServing{}}, &handler.EnqueueRequestForObject{})
-		err = c.Watch(&source.Kind{Type: &addonsv1alpha1.KnativeBuild{}}, &handler.EnqueueRequestForObject{})
-		err = c.Watch(&source.Kind{Type: &addonsv1alpha1.KnativeServing{}}, &handler.EnqueueRequestForObject{})
-	*/
 	return nil
 }
 

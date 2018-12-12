@@ -17,11 +17,11 @@ kubectl apply -f config/samples/addons_v1alpha1_knative.yaml
 
 # View Status
 ```bash
-kubectl -n kube-serving get pods
-kubectl -n kube-serving get kubeserving -oyaml
+kubectl -n knative-serving get pods
+kubectl -n knative-serving get knativeserving -oyaml
 
-kubectl -n kube-build get pods
-kubectl -n kube-build get kubebuild -oyaml
+kubectl -n knative-build get pods
+kubectl -n knative-build get knativebuild -oyaml
 ```
 
 # Update version
@@ -31,8 +31,8 @@ kubectl -n kube-system edit knatives
 # update 'channel' to 'alpha'
 
 # observe changes to v0.2.2
-kubectl -n kube-build get kubebuild -oyaml
+kubectl -n knative-build get knativebuild -oyaml
 
-kubectl -n kube-serving get pods
-kubectl -n kube-serving get kubeserving -oyaml
+kubectl -n knative-serving get pods
+kubectl -n kube-serving get knativeserving -oyaml
 ```

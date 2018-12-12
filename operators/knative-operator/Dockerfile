@@ -15,6 +15,6 @@ FROM ubuntu:latest
 WORKDIR /
 ADD https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kubectl /bin/kubectl
 RUN chmod a+x /bin/kubectl
-COPY --from=builder /go/src/{{ .Repo }}/manager .
+COPY --from=builder /go/src/sigs.k8s.io/cluster-api-provider-gcp/operators/knative-operator/manager .
 COPY channels/ /channels/
 ENTRYPOINT ["/manager"]
