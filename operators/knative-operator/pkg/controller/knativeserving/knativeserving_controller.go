@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package knative
+package knativeserving
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +37,7 @@ var log = logf.Log.WithName("controller")
 * business logic.  Delete these comments after modifying this file.*
  */
 
-// Add creates a new Knative Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
+// Add creates a new KnativeServing Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
@@ -45,10 +45,9 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	r := &ReconcileKnative{}
+	r := &ReconcileKnativeServing{}
 
-	r.Reconciler.Init(mgr, &addonsv1alpha1.Knative{}, "knative") //		operators.WithRawManifestOperation(ReplaceNamespacePattern("{{ .Release.Namespace }}")),
-	//addon.WithGroupVersionKind(addonsv1alpha1.SchemeGroupVersion.WithKind("knative")),
+	r.Reconciler.Init(mgr, &addonsv1alpha1.KnativeServing{}, "knativeserving") //addon.WithGroupVersionKind(addonsv1alpha1.SchemeGroupVersion.WithKind("knativeserving")),
 
 	return r
 }
@@ -56,13 +55,13 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("knative-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("knativeserving-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to Knative
-	err = c.Watch(&source.Kind{Type: &addonsv1alpha1.Knative{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to KnativeServing
+	err = c.Watch(&source.Kind{Type: &addonsv1alpha1.KnativeServing{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -70,7 +69,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileKnative{}
+var _ reconcile.Reconciler = &ReconcileKnativeServing{}
 
 // +kubebuilder:rbac:groups=addons.sigs.k8s.io,resources=corednss,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
@@ -79,8 +78,8 @@ var _ reconcile.Reconciler = &ReconcileKnative{}
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
-// ReconcileKnative reconciles a Knative object
-type ReconcileKnative struct {
+// ReconcileKnativeServing reconciles a KnativeServing object
+type ReconcileKnativeServing struct {
 	declarative.Reconciler
 	client.Client
 	scheme *runtime.Scheme
