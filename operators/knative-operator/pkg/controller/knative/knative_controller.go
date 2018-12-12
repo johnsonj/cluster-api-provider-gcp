@@ -19,12 +19,15 @@ package knative
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	//"sigs.k8s.io/controller-runtime/alpha/patterns/addon"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "sigs.k8s.io/cluster-api-provider-gcp/operators/knative-operator/pkg/apis/addons/v1alpha1"
+	addons "sigs.k8s.io/controller-runtime/alpha/patterns/addon/pkg/apis/v1alpha1"
 	"sigs.k8s.io/controller-runtime/alpha/patterns/declarative"
 	"sigs.k8s.io/controller-runtime/alpha/patterns/declarative/pkg/manifest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +49,7 @@ func Add(mgr manager.Manager) error {
 	r.Reconciler.Init(mgr, &api.Knative{}, "knative",
 		declarative.WithPreserveNamespace(),
 		declarative.WithObjectTransform(handleKnativeLifecycle(mgr)),
+		declarative.WithStatus(&knativeStatus{mgr: mgr}),
 	)
 
 	c, err := controller.New("knative-controller", mgr, controller.Options{Reconciler: r})
@@ -123,30 +127,30 @@ func handleKnativeLifecycle(mgr manager.Manager) declarative.ObjectTransform {
 	}
 }
 
-func deleteCrossNamespace(ctx context.Context, c client.Client) error {
-	// hardcoded for demo!
-	objs := []struct {
-		key client.ObjectKey
-		obj runtime.Object
-	}{
-		{
-			key: client.ObjectKey{Name: "default", Namespace: "knative-build"},
-			obj: &api.KnativeBuild{},
-		},
-		{
-			key: client.ObjectKey{Name: "default", Namespace: "istio-system"},
-			obj: &api.KnativeIstio{},
-		},
-		{
-			key: client.ObjectKey{Name: "default", Namespace: "knative-monitoring"},
-			obj: &api.KnativeMonitoring{},
-		},
-		{
-			key: client.ObjectKey{Name: "default", Namespace: "knative-serving"},
-			obj: &api.KnativeServing{},
-		},
-	}
+// hardcoded for demo!
+var objs = []struct {
+	key client.ObjectKey
+	obj runtime.Object
+}{
+	{
+		key: client.ObjectKey{Name: "default", Namespace: "knative-build"},
+		obj: &api.KnativeBuild{},
+	},
+	{
+		key: client.ObjectKey{Name: "default", Namespace: "istio-system"},
+		obj: &api.KnativeIstio{},
+	},
+	{
+		key: client.ObjectKey{Name: "default", Namespace: "knative-monitoring"},
+		obj: &api.KnativeMonitoring{},
+	},
+	{
+		key: client.ObjectKey{Name: "default", Namespace: "knative-serving"},
+		obj: &api.KnativeServing{},
+	},
+}
 
+func deleteCrossNamespace(ctx context.Context, c client.Client) error {
 	for _, target := range objs {
 		if err := c.Get(ctx, target.key, target.obj); err != nil {
 			if errors.IsNotFound(err) {
@@ -158,6 +162,91 @@ func deleteCrossNamespace(ctx context.Context, c client.Client) error {
 		if err := c.Delete(ctx, target.obj); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+type knativeStatus struct {
+	mgr manager.Manager
+}
+
+func (ks *knativeStatus) Reconciled(ctx context.Context, o declarative.DeclarativeObject, m *manifest.Objects) error {
+	c := ks.mgr.GetClient()
+
+	obj, ok := o.(*api.Knative)
+	if !ok {
+		return fmt.Errorf("expected resource to be Knative but was: %T", o)
+	}
+
+	var errs []string
+	for _, target := range objs {
+		if err := c.Get(ctx, target.key, target.obj); err != nil {
+			errs = append(errs, fmt.Sprintf("can not find %s", target.key))
+			continue
+		}
+
+		// TODO: aggregate status of addon crs
+		/*
+			obj, ok := target.obj.(*addons.CommonStatus)
+			if !ok {
+				log.Error(err, "expected addons.CommonStatus, got: %T", o)
+			}
+			if !obj.Healthy {
+				errs = append(errs, fmt.Sprintf("%s is not healthy", target.key))
+			}
+		*/
+	}
+
+	cs := addons.CommonStatus{Errors: errs}
+	if len(errs) == 0 {
+		cs.Healthy = true
+	}
+
+	if !reflect.DeepEqual(cs, obj.GetCommonStatus()) {
+		obj.SetCommonStatus(cs)
+		if err := c.Update(ctx, obj); err != nil {
+			log.Error(err, "updating preflight status")
+			return err
+		}
+	}
+
+	return nil
+}
+func (ks *knativeStatus) Preflight(ctx context.Context, o declarative.DeclarativeObject) error {
+	c := ks.mgr.GetClient()
+	obj, ok := o.(*api.Knative)
+	if !ok {
+		return fmt.Errorf("expected resource to be Knative but was: %T", o)
+	}
+
+	// Don't check for Preflight on Delete
+	if obj.GetDeletionTimestamp() != nil {
+		return nil
+	}
+
+	// Check for istio installation
+	key := client.ObjectKey{Namespace: "istio-system", Name: "istio-pilot"}
+	dep := &appsv1.Deployment{}
+
+	if err := c.Get(ctx, key, dep); err != nil {
+		cs := addons.CommonStatus{Healthy: false}
+
+		if errors.IsNotFound(err) {
+			cs.Errors = []string{"istio-system/istio-pilot not found"}
+		} else {
+			cs.Errors = []string{fmt.Sprintf("fetching istio-pilot: %v", err)}
+		}
+
+		if !reflect.DeepEqual(cs, obj.GetCommonStatus()) {
+			obj.SetCommonStatus(cs)
+			if err := c.Update(ctx, obj); err != nil {
+				log.Error(err, "updating preflight status")
+				return err
+			}
+		}
+
+		return err
 	}
 
 	return nil
