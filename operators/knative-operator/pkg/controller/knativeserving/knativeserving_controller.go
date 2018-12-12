@@ -18,8 +18,8 @@ package knativeserving
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
-	//"sigs.k8s.io/controller-runtime/alpha/patterns/addon"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-provider-gcp/operators/knative-operator/pkg/apis/addons/v1alpha1"
+	"sigs.k8s.io/controller-runtime/alpha/patterns/addon/pkg/status"
 	"sigs.k8s.io/controller-runtime/alpha/patterns/declarative"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -40,20 +40,14 @@ var log = logf.Log.WithName("controller")
 // Add creates a new KnativeServing Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
-}
-
-// newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileKnativeServing{}
 
-	r.Reconciler.Init(mgr, &addonsv1alpha1.KnativeServing{}, "knativeserving") //addon.WithGroupVersionKind(addonsv1alpha1.SchemeGroupVersion.WithKind("knativeserving")),
+	r.Reconciler.Init(mgr, &addonsv1alpha1.KnativeServing{}, "knativeserving",
+		declarative.WithOwner(declarative.SourceAsOwner),
+		declarative.WithLabels(declarative.SourceLabel),
+		declarative.WithStatus(status.NewBasic(mgr.GetClient())),
+	)
 
-	return r
-}
-
-// add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("knativeserving-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -62,6 +56,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to KnativeServing
 	err = c.Watch(&source.Kind{Type: &addonsv1alpha1.KnativeServing{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to deployed objects
+	_, err = declarative.WatchAll(mgr.GetConfig(), c, r, declarative.SourceLabel)
 	if err != nil {
 		return err
 	}

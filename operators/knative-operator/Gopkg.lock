@@ -846,12 +846,12 @@
   revision = "0317810137be915b9cf888946c6e115c1bfac693"
 
 [[projects]]
-  branch = "integration"
-  digest = "1:a17579d6404775d3a99c657a062a9423efd4d3d299f3a6da28a62295b9f6f690"
+  digest = "1:886305d6177a8404cfeb12a29801fa741336999e9f2ab2730c760bd196bc8e5f"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "alpha/patterns/addon/pkg/apis/v1alpha1",
     "alpha/patterns/addon/pkg/loaders",
+    "alpha/patterns/addon/pkg/status",
     "alpha/patterns/declarative",
     "alpha/patterns/declarative/pkg/kubectlcmd",
     "alpha/patterns/declarative/pkg/manifest",
@@ -892,8 +892,8 @@
     "pkg/webhook/types",
   ]
   pruneopts = "UT"
-  revision = "a7469e3f110d2441f595981430aa6ed0d0a7ae3d"
-  source = "https://github.com/justinsb/controller-runtime.git"
+  revision = "a2bc86a280a59334f080586ae4e0562af9403833"
+  source = "https://github.com/johnsonj/controller-runtime.git"
 
 [[projects]]
   digest = "1:2ad3b6ee1aab2b1e6c88881502cc3da56aeb803c9de3440af7b720298fbdf5cb"
@@ -933,9 +933,7 @@
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "golang.org/x/net/context",
-    "k8s.io/api/apps/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
-    "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
@@ -946,6 +944,7 @@
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "sigs.k8s.io/controller-runtime/alpha/patterns/addon/pkg/apis/v1alpha1",
+    "sigs.k8s.io/controller-runtime/alpha/patterns/addon/pkg/status",
     "sigs.k8s.io/controller-runtime/alpha/patterns/declarative",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",

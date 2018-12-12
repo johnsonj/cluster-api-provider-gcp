@@ -32,30 +32,15 @@ import (
 
 var log = logf.Log.WithName("controller")
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
-
 // Add creates a new Knative Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
-}
-
-// newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileKnative{}
 
-	r.Reconciler.Init(mgr, &addonsv1alpha1.Knative{}, "knative") //		operators.WithRawManifestOperation(ReplaceNamespacePattern("{{ .Release.Namespace }}")),
-	//addon.WithGroupVersionKind(addonsv1alpha1.SchemeGroupVersion.WithKind("knative")),
+	r.Reconciler.Init(mgr, &addonsv1alpha1.Knative{}, "knative",
+		declarative.WithPreserveNamespace(),
+	)
 
-	return r
-}
-
-// add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Create a new controller
 	c, err := controller.New("knative-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
@@ -67,6 +52,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to deployed objects
+	_, err = declarative.WatchAll(mgr.GetConfig(), c, r, declarative.SourceLabel)
+	if err != nil {
+		return err
+	}
+
+	/*
+		err = c.Watch(&source.Kind{Type: &addonsv1alpha1.KnativeServing{}}, &handler.EnqueueRequestForObject{})
+		err = c.Watch(&source.Kind{Type: &addonsv1alpha1.KnativeBuild{}}, &handler.EnqueueRequestForObject{})
+		err = c.Watch(&source.Kind{Type: &addonsv1alpha1.KnativeServing{}}, &handler.EnqueueRequestForObject{})
+	*/
 	return nil
 }
 

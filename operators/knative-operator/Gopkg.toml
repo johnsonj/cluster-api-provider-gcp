@@ -34,5 +34,5 @@ version="v1.4.7"
 
 [[override]]
 name = "sigs.k8s.io/controller-runtime"
-source = "https://github.com/justinsb/controller-runtime.git"
-branch="integration"
+source = "https://github.com/johnsonj/controller-runtime.git"
+revision="a2bc86a280a59334f080586ae4e0562af9403833"
