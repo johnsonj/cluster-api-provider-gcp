@@ -35,4 +35,4 @@ version="v1.4.7"
 [[override]]
 name = "sigs.k8s.io/controller-runtime"
 source = "https://github.com/johnsonj/controller-runtime.git"
-revision="a2bc86a280a59334f080586ae4e0562af9403833"
+revision="50988aae2559bbdd469621031ad354624f887e7f"

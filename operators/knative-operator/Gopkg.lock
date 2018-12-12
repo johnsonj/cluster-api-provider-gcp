@@ -846,7 +846,7 @@
   revision = "0317810137be915b9cf888946c6e115c1bfac693"
 
 [[projects]]
-  digest = "1:886305d6177a8404cfeb12a29801fa741336999e9f2ab2730c760bd196bc8e5f"
+  digest = "1:2058b22f48b698ed0b512063c4c0ff812ab90cc84a5cb3d147b29964ef0e286b"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "alpha/patterns/addon/pkg/apis/v1alpha1",
@@ -892,7 +892,7 @@
     "pkg/webhook/types",
   ]
   pruneopts = "UT"
-  revision = "a2bc86a280a59334f080586ae4e0562af9403833"
+  revision = "50988aae2559bbdd469621031ad354624f887e7f"
   source = "https://github.com/johnsonj/controller-runtime.git"
 
 [[projects]]

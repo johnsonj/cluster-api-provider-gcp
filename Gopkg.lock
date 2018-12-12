@@ -887,13 +887,13 @@
   revision = "6fe3ecb17bdcdf096ede34104af87f79c2e90e68"
 
 [[projects]]
-  branch = "integration"
-  digest = "1:55341672018396db4aafd78e26dedd3c4d7107ea7d791335df391091eddf3c6a"
+  digest = "1:39b3838acb25938f6be012b80ae8e64f4651501aabc429e72ff5b985f784ec1d"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "alpha/patterns/addon",
     "alpha/patterns/addon/pkg/apis/v1alpha1",
     "alpha/patterns/addon/pkg/loaders",
+    "alpha/patterns/addon/pkg/status",
     "alpha/patterns/declarative",
     "alpha/patterns/declarative/pkg/kubectlcmd",
     "alpha/patterns/declarative/pkg/manifest",
@@ -934,7 +934,7 @@
     "pkg/webhook/types",
   ]
   pruneopts = "UT"
-  revision = "a2bc86a280a59334f080586ae4e0562af9403833"
+  revision = "50988aae2559bbdd469621031ad354624f887e7f"
   source = "https://github.com/johnsonj/controller-runtime.git"
 
 [[projects]]
@@ -985,10 +985,8 @@
     "google.golang.org/api/googleapi",
     "google.golang.org/api/servicemanagement/v1",
     "gopkg.in/gcfg.v1",
-    "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
-    "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
@@ -1016,6 +1014,7 @@
     "sigs.k8s.io/cluster-api/pkg/util",
     "sigs.k8s.io/controller-runtime/alpha/patterns/addon",
     "sigs.k8s.io/controller-runtime/alpha/patterns/addon/pkg/apis/v1alpha1",
+    "sigs.k8s.io/controller-runtime/alpha/patterns/addon/pkg/status",
     "sigs.k8s.io/controller-runtime/alpha/patterns/declarative",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
