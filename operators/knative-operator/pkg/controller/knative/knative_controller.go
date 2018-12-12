@@ -24,7 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	//"sigs.k8s.io/controller-runtime/alpha/patterns/addon"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "sigs.k8s.io/cluster-api-provider-gcp/operators/knative-operator/pkg/apis/addons/v1alpha1"
 	addons "sigs.k8s.io/controller-runtime/alpha/patterns/addon/pkg/apis/v1alpha1"
@@ -32,8 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/alpha/patterns/declarative/pkg/manifest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -63,13 +68,61 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	// Watch for changes to deployed objects
-	_, err = declarative.WatchAll(mgr.GetConfig(), c, r, declarative.SourceLabel)
+	// TODO: It'd be easier to watch for an istio CRD
+	// Watch for changes to istio-system/istio-sidecar-injector so we Reconcile
+	// when it appears after failing preflight.
+
+	isPilot := func(m metav1.Object) bool {
+		return m.GetNamespace() == "istio-system" && m.GetName() == "istio-sidecar-injector"
+	}
+
+	filter := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return isPilot(e.Meta)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return isPilot(e.Meta)
+		},
+		UpdateFunc:  func(event.UpdateEvent) bool { return false },
+		GenericFunc: func(event.GenericEvent) bool { return false },
+	}
+
+	mapToSingleton := &handler.EnqueueRequestsFromMapFunc{ToRequests: &mapper{}}
+
+	dep := &appsv1.Deployment{}
+	err = c.Watch(&source.Kind{Type: dep}, &handler.EnqueueRequestForObject{}, filter)
 	if err != nil {
 		return err
 	}
 
+	// Watch for changes to other Knative CRDs
+	err = c.Watch(&source.Kind{Type: &api.KnativeBuild{}}, mapToSingleton)
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &api.KnativeServing{}}, mapToSingleton)
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &api.KnativeMonitoring{}}, mapToSingleton)
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &api.KnativeIstio{}}, mapToSingleton)
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+type mapper struct {
+}
+
+// We can't use the typical owner ref mapping because we're going cross namepsace.
+// This implementation always maps a request to the root Knative object.
+func (mapper) Map(handler.MapObject) []reconcile.Request {
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: "kube-system", Name: "default"}}
+	return []reconcile.Request{req}
 }
 
 var _ reconcile.Reconciler = &ReconcileKnative{}
@@ -130,7 +183,7 @@ func handleKnativeLifecycle(mgr manager.Manager) declarative.ObjectTransform {
 // hardcoded for demo!
 var objs = []struct {
 	key client.ObjectKey
-	obj runtime.Object
+	obj addons.CommonObject
 }{
 	{
 		key: client.ObjectKey{Name: "default", Namespace: "knative-build"},
@@ -172,6 +225,8 @@ type knativeStatus struct {
 }
 
 func (ks *knativeStatus) Reconciled(ctx context.Context, o declarative.DeclarativeObject, m *manifest.Objects) error {
+	log.Info("on reconcile knative status!")
+
 	c := ks.mgr.GetClient()
 
 	obj, ok := o.(*api.Knative)
@@ -186,16 +241,9 @@ func (ks *knativeStatus) Reconciled(ctx context.Context, o declarative.Declarati
 			continue
 		}
 
-		// TODO: aggregate status of addon crs
-		/*
-			obj, ok := target.obj.(*addons.CommonStatus)
-			if !ok {
-				log.Error(err, "expected addons.CommonStatus, got: %T", o)
-			}
-			if !obj.Healthy {
-				errs = append(errs, fmt.Sprintf("%s is not healthy", target.key))
-			}
-		*/
+		if !target.obj.GetCommonStatus().Healthy {
+			errs = append(errs, fmt.Sprintf("%s is not healthy", target.key))
+		}
 	}
 
 	cs := addons.CommonStatus{Errors: errs}
@@ -204,6 +252,7 @@ func (ks *knativeStatus) Reconciled(ctx context.Context, o declarative.Declarati
 	}
 
 	if !reflect.DeepEqual(cs, obj.GetCommonStatus()) {
+		log.Info("updating Knative status")
 		obj.SetCommonStatus(cs)
 		if err := c.Update(ctx, obj); err != nil {
 			log.Error(err, "updating preflight status")
@@ -226,18 +275,31 @@ func (ks *knativeStatus) Preflight(ctx context.Context, o declarative.Declarativ
 	}
 
 	// Check for istio installation
-	key := client.ObjectKey{Namespace: "istio-system", Name: "istio-pilot"}
+	key := client.ObjectKey{Namespace: "istio-system", Name: "istio-sidecar-injector"}
 	dep := &appsv1.Deployment{}
 
+	cs := addons.CommonStatus{}
 	if err := c.Get(ctx, key, dep); err != nil {
-		cs := addons.CommonStatus{Healthy: false}
-
 		if errors.IsNotFound(err) {
-			cs.Errors = []string{"istio-system/istio-pilot not found"}
+			cs.Errors = []string{"deployment istio-system/istio-sidecar-injector not found"}
 		} else {
-			cs.Errors = []string{fmt.Sprintf("fetching istio-pilot: %v", err)}
+			cs.Errors = []string{fmt.Sprintf("fetching istio-sidecar-injector: %v", err)}
+		}
+	} else {
+		depHealthy := false
+		for _, cond := range dep.Status.Conditions {
+			if cond.Type == appsv1.DeploymentAvailable && cond.Status == corev1.ConditionTrue {
+				depHealthy = true
+			}
 		}
 
+		if !depHealthy {
+			cs.Errors = []string{fmt.Sprintf("deployment (%s) does not meet condition: %s", key, appsv1.DeploymentAvailable)}
+		}
+	}
+
+	if len(cs.Errors) != 0 {
+		cs.Healthy = false
 		if !reflect.DeepEqual(cs, obj.GetCommonStatus()) {
 			obj.SetCommonStatus(cs)
 			if err := c.Update(ctx, obj); err != nil {
@@ -246,7 +308,7 @@ func (ks *knativeStatus) Preflight(ctx context.Context, o declarative.Declarativ
 			}
 		}
 
-		return err
+		return fmt.Errorf("%v", cs)
 	}
 
 	return nil
