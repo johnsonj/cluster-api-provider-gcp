@@ -17,10 +17,16 @@ limitations under the License.
 package knative
 
 import (
+	"context"
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	//"sigs.k8s.io/controller-runtime/alpha/patterns/addon"
-	addonsv1alpha1 "sigs.k8s.io/cluster-api-provider-gcp/operators/knative-operator/pkg/apis/addons/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	api "sigs.k8s.io/cluster-api-provider-gcp/operators/knative-operator/pkg/apis/addons/v1alpha1"
 	"sigs.k8s.io/controller-runtime/alpha/patterns/declarative"
+	"sigs.k8s.io/controller-runtime/alpha/patterns/declarative/pkg/manifest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -37,8 +43,9 @@ var log = logf.Log.WithName("controller")
 func Add(mgr manager.Manager) error {
 	r := &ReconcileKnative{}
 
-	r.Reconciler.Init(mgr, &addonsv1alpha1.Knative{}, "knative",
+	r.Reconciler.Init(mgr, &api.Knative{}, "knative",
 		declarative.WithPreserveNamespace(),
+		declarative.WithObjectTransform(handleKnativeLifecycle(mgr)),
 	)
 
 	c, err := controller.New("knative-controller", mgr, controller.Options{Reconciler: r})
@@ -47,7 +54,7 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to Knative
-	err = c.Watch(&source.Kind{Type: &addonsv1alpha1.Knative{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &api.Knative{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -75,4 +82,83 @@ type ReconcileKnative struct {
 	declarative.Reconciler
 	client.Client
 	scheme *runtime.Scheme
+}
+
+const (
+	operatorFinalizer = "operator.knative.sig.addons.k8s.io"
+)
+
+func handleKnativeLifecycle(mgr manager.Manager) declarative.ObjectTransform {
+	return func(ctx context.Context, o declarative.DeclarativeObject, m *manifest.Objects) error {
+		obj, ok := o.(*api.Knative)
+		if !ok {
+			return fmt.Errorf("expected resource to be Knative but was: %T", o)
+		}
+		c := mgr.GetClient()
+		finalizers := obj.GetFinalizers()
+		finalizerSet := sets.NewString(finalizers...)
+		if o.GetDeletionTimestamp() != nil {
+			log.Info("Running finalizer on Knative")
+			if err := deleteCrossNamespace(ctx, c); err != nil {
+				return err
+			}
+
+			log.Info("Removing Finalizer")
+			finalizerSet.Delete(operatorFinalizer)
+			obj.SetFinalizers(finalizerSet.UnsortedList())
+			if err := c.Update(ctx, obj); err != nil {
+				return fmt.Errorf("could not finalize Knative: %v", err)
+			}
+			m.Items = nil
+			return nil
+		}
+		if !finalizerSet.Has(operatorFinalizer) {
+			// Ensure Finalizer has been registered
+			obj.SetFinalizers(append(finalizers, operatorFinalizer))
+			if err := c.Update(ctx, obj); err != nil {
+				return fmt.Errorf("could not add finalizer to Knative: %v", err)
+			}
+		}
+		return nil
+	}
+}
+
+func deleteCrossNamespace(ctx context.Context, c client.Client) error {
+	// hardcoded for demo!
+	objs := []struct {
+		key client.ObjectKey
+		obj runtime.Object
+	}{
+		{
+			key: client.ObjectKey{Name: "default", Namespace: "knative-build"},
+			obj: &api.KnativeBuild{},
+		},
+		{
+			key: client.ObjectKey{Name: "default", Namespace: "istio-system"},
+			obj: &api.KnativeIstio{},
+		},
+		{
+			key: client.ObjectKey{Name: "default", Namespace: "knative-monitoring"},
+			obj: &api.KnativeMonitoring{},
+		},
+		{
+			key: client.ObjectKey{Name: "default", Namespace: "knative-serving"},
+			obj: &api.KnativeServing{},
+		},
+	}
+
+	for _, target := range objs {
+		if err := c.Get(ctx, target.key, target.obj); err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			} else {
+				return err
+			}
+		}
+		if err := c.Delete(ctx, target.obj); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
