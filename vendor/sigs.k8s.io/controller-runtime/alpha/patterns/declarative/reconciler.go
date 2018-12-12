@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -39,6 +40,7 @@ type kubectlClient interface {
 
 type DeclarativeObject interface {
 	runtime.Object
+	metav1.Object
 }
 
 // For mocking
@@ -93,6 +95,13 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, err
 	}
 
+	if r.options.status != nil {
+		if err := r.options.status.Preflight(ctx, instance); err != nil {
+			log.Error(err, "preflight check failed, not reconciling")
+			return reconcile.Result{}, err
+		}
+	}
+
 	return r.reconcileExists(ctx, request.NamespacedName, instance)
 }
 
@@ -105,22 +114,20 @@ func (r *Reconciler) reconcileExists(ctx context.Context, name types.NamespacedN
 		log.Error(err, "building deployment objects")
 		return reconcile.Result{}, fmt.Errorf("error building deployment objects: %v", err)
 	}
-
 	log.WithValues("objects", fmt.Sprintf("%d", len(objects.Items))).Info("built deployment objects")
 
-	/*
-		app, err := r.ensureApplication(ctx, name, instance, objects)
-		if err != nil {
-			log.Error(err, "ensuring application")
-			return reconcile.Result{}, err
+	defer func() {
+		if r.options.status != nil {
+			if err := r.options.status.Reconciled(ctx, instance, objects); err != nil {
+				log.Error(err, "failed to reconcile status")
+			}
 		}
-		defer r.reconcileStatus(ctx, name, instance, app, objects)
+	}()
 
-		err = r.injectOwnerRef(ctx, instance, objects)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-	*/
+	err = r.injectOwnerRef(ctx, instance, objects)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	m, err := objects.JSONManifest()
 	if err != nil {
@@ -142,18 +149,22 @@ func (r *Reconciler) reconcileExists(ctx context.Context, name types.NamespacedN
 			}
 	*/
 
-	if err := r.kubectl.Apply(ctx, name.Namespace, m, extraArgs...); err != nil {
-		log.Error(err, "applying manifest")
+	ns := ""
+	if !r.options.preserveNamespace {
+		ns = name.Namespace
+	}
 
+	if err := r.kubectl.Apply(ctx, ns, m, extraArgs...); err != nil {
+		log.Error(err, "applying manifest")
 		return reconcile.Result{}, fmt.Errorf("error applying manifest: %v", err)
 	}
 
-	/*
-		if err := r.ensureWatches(ctx, name, objects); err != nil {
-			log.Error(err, "watching deployed object types")
-			panic(fmt.Errorf("error watching deployed object types: %v", err))
+	if r.options.sink != nil {
+		if err := r.options.sink.Notify(ctx, instance, objects); err != nil {
+			log.Error(err, "notifying sink")
+			return reconcile.Result{}, err
 		}
-	*/
+	}
 
 	return reconcile.Result{}, nil
 }
@@ -187,10 +198,11 @@ func (r *Reconciler) BuildDeploymentObjects(ctx context.Context, name types.Name
 	}
 
 	// 4. Perform object transformations
-
-	// Always add a fixed set of labels for grouping with Application
-	//transforms := append(r.options.objectTransformations, AddLabels(r.labels(name)))
 	transforms := r.options.objectTransformations
+	if r.options.labelMaker != nil {
+		transforms = append(transforms, AddLabels(r.options.labelMaker(ctx, instance)))
+	}
+	// TODO(jrjohnson): apply namespace here
 	for _, t := range transforms {
 		err := t(ctx, instance, objects)
 		if err != nil {
@@ -238,4 +250,45 @@ func (r *Reconciler) applyOptions(opts ...reconcilerOption) {
 	}
 
 	r.options = params
+}
+
+func (r *Reconciler) injectOwnerRef(ctx context.Context, instance DeclarativeObject, objects *manifest.Objects) error {
+	if r.options.ownerFn == nil {
+		return nil
+	}
+
+	log := log.Log
+	log.WithValues("object", instance).Info("injecting owner references")
+
+	for _, o := range objects.Items {
+		owner, err := r.options.ownerFn(ctx, instance, *o, *objects)
+		if err != nil {
+			log.WithValues("object", o).Error(err, "resolving owner ref", o)
+			return err
+		}
+		if owner == nil {
+			log.WithValues("object", o).Info("no owner resolved")
+		}
+
+		gvk := owner.GetObjectKind().GroupVersionKind()
+		ownerRefs := []interface{}{
+			map[string]interface{}{
+				"apiVersion":         gvk.Group + "/" + gvk.Version,
+				"blockOwnerDeletion": true,
+				"controller":         true,
+				"kind":               gvk.Kind,
+				"name":               owner.GetName(),
+				"uid":                string(owner.GetUID()),
+			},
+		}
+		if err := o.SetNestedField(ownerRefs, "metadata", "ownerReferences"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetSink provides a Sink that will be notified for all deployments
+func (r *Reconciler) SetSink(sink Sink) {
+	r.options.sink = sink
 }

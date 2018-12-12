@@ -42,9 +42,9 @@ version="v1.4.7"
   version = "1.2.3"
 
 [[override]]
-  name   = "sigs.k8s.io/controller-runtime"
-  source = "https://github.com/johnsonj/controller-runtime.git"
-  branch = "minimal_addon_and_declarative_patterns"
+name = "sigs.k8s.io/controller-runtime"
+source = "https://github.com/johnsonj/controller-runtime.git"
+branch="integration"
 
 [[override]]
   name    = "k8s.io/api"
